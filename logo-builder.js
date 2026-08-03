@@ -5,10 +5,17 @@
   const SCREEN_HEIGHT = 2048;
   const KEYBOARD_STEP = 1;
   const KEYBOARD_FAST_STEP = 10;
-  const WAVE_HEIGHT = 48;
-  const WAVE_DURATION = 260;
-  const WAVE_LETTER_DELAY = 90;
+  const BASE_WAVE_HEIGHT = 48;
+  const BASE_WAVE_DURATION = 260;
+  const BASE_WAVE_LETTER_DELAY = 90;
   const STORAGE_KEY = 'spice-cream-word-layout-v2';
+  const WAVE_SETTINGS_STORAGE_KEY = 'spice-cream-wave-settings-v1';
+  const DEFAULT_WAVE_SETTINGS = {
+    speed: 1,
+    offset: 880,
+    height: BASE_WAVE_HEIGHT,
+    loop: false
+  };
 
   const ASSETS = [
     { key: 'letter-s', src: 's.png' },
@@ -43,10 +50,18 @@
   const copyButton = document.getElementById('copy-positions');
   const resetButton = document.getElementById('reset-positions');
   const editorStatus = document.getElementById('editor-status');
+  const waveSpeedInput = document.getElementById('wave-speed');
+  const waveOffsetInput = document.getElementById('wave-offset');
+  const waveHeightInput = document.getElementById('wave-height');
+  const waveLoopInput = document.getElementById('wave-loop');
+  const waveSpeedValue = document.getElementById('wave-speed-value');
+  const waveOffsetValue = document.getElementById('wave-offset-value');
+  const waveHeightValue = document.getElementById('wave-height-value');
   const loadedImages = new Map();
 
   let scene = null;
   let statusTimer = null;
+  let waveSettings = readWaveSettings();
 
   function showMessage(text) {
     message.textContent = text;
@@ -84,6 +99,68 @@
     } catch (error) {
       return {};
     }
+  }
+
+  function readWaveSettings() {
+    try {
+      const saved = JSON.parse(
+        window.localStorage.getItem(WAVE_SETTINGS_STORAGE_KEY)
+      ) || {};
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      return {
+        speed: clamp(
+          Number(saved.speed) || DEFAULT_WAVE_SETTINGS.speed,
+          0.5,
+          2
+        ),
+        offset: clamp(
+          Number.isFinite(Number(saved.offset))
+            ? Number(saved.offset)
+            : DEFAULT_WAVE_SETTINGS.offset,
+          0,
+          1400
+        ),
+        height: clamp(
+          Number.isFinite(Number(saved.height))
+            ? Number(saved.height)
+            : DEFAULT_WAVE_SETTINGS.height,
+          0,
+          120
+        ),
+        loop: saved.loop === true
+      };
+    } catch (error) {
+      return { ...DEFAULT_WAVE_SETTINGS };
+    }
+  }
+
+  function saveWaveSettings() {
+    window.localStorage.setItem(
+      WAVE_SETTINGS_STORAGE_KEY,
+      JSON.stringify(waveSettings)
+    );
+  }
+
+  function syncWaveControls() {
+    waveSpeedInput.value = waveSettings.speed;
+    waveOffsetInput.value = waveSettings.offset;
+    waveHeightInput.value = waveSettings.height;
+    waveLoopInput.checked = waveSettings.loop;
+    waveSpeedValue.textContent = `${waveSettings.speed.toFixed(2)}×`;
+    waveOffsetValue.textContent = `${Math.round(waveSettings.offset)} мс`;
+    waveHeightValue.textContent = `${Math.round(waveSettings.height)} px`;
+  }
+
+  function updateWaveSettingsFromControls() {
+    waveSettings = {
+      speed: Number(waveSpeedInput.value),
+      offset: Number(waveOffsetInput.value),
+      height: Number(waveHeightInput.value),
+      loop: waveLoopInput.checked
+    };
+    syncWaveControls();
+    saveWaveSettings();
   }
 
   function getLetterPositions() {
@@ -275,6 +352,10 @@
 
       this.createWaveButton();
       this.scheduleSparkle();
+
+      if (waveSettings.loop) {
+        this.time.delayedCall(250, () => this.playLogoWave());
+      }
     }
 
     getWordSprites(word) {
@@ -455,52 +536,70 @@
         Phaser.Utils.Array.GetRandom(SPARK_TEXTURES)
       );
       const targetScale = Phaser.Math.FloatBetween(1.15, 2.2);
+      const startAngle = Phaser.Math.Between(0, 359);
+      const rotation = Phaser.Math.Between(30, 95)
+        * (Math.random() < 0.5 ? -1 : 1);
 
       sparkle
         .setDepth(50)
-        .setAlpha(0)
-        .setScale(0)
-        .setAngle(Phaser.Math.Between(0, 359))
+        .setAlpha(1)
+        .setScale(0.02)
+        .setAngle(startAngle)
         .setBlendMode(Phaser.BlendModes.ADD);
 
       this.tweens.add({
         targets: sparkle,
-        alpha: 1,
         scaleX: targetScale,
         scaleY: targetScale,
-        duration: Phaser.Math.Between(70, 115),
-        ease: 'Back.easeOut',
+        angle: startAngle + rotation * 0.55,
+        duration: Phaser.Math.Between(260, 480),
+        ease: 'Sine.easeOut',
         onComplete: () => {
-          this.tweens.add({
-            targets: sparkle,
-            alpha: 0,
-            scaleX: targetScale * 1.22,
-            scaleY: targetScale * 1.22,
-            duration: Phaser.Math.Between(120, 190),
-            ease: 'Quad.easeIn',
-            onComplete: () => sparkle.destroy()
+          this.time.delayedCall(Phaser.Math.Between(80, 320), () => {
+            this.tweens.add({
+              targets: sparkle,
+              scaleX: 0,
+              scaleY: 0,
+              angle: startAngle + rotation,
+              duration: Phaser.Math.Between(240, 420),
+              ease: 'Sine.easeIn',
+              onComplete: () => sparkle.destroy()
+            });
           });
         }
       });
     }
 
+    spawnSparkleBurst() {
+      const roll = Math.random();
+      const count = roll < 0.5 ? 1 : roll < 0.84 ? 2 : 3;
+
+      for (let index = 0; index < count; index += 1) {
+        this.time.delayedCall(Phaser.Math.Between(0, 700), () => {
+          this.spawnSparkle();
+        });
+      }
+    }
+
     scheduleSparkle() {
-      this.time.delayedCall(Phaser.Math.Between(150, 380), () => {
-        this.spawnSparkle();
+      this.time.delayedCall(Phaser.Math.Between(1400, 3400), () => {
+        this.spawnSparkleBurst();
         this.scheduleSparkle();
       });
     }
 
-    queueWordWave(word, startDelay) {
+    queueWordWave(word, startDelay, settings) {
       const sprites = this.getWordSprites(word);
+      const duration = BASE_WAVE_DURATION / settings.speed;
+      const letterDelay = BASE_WAVE_LETTER_DELAY / settings.speed;
 
       sprites.forEach((sprite, index) => {
         const baseY = sprite.y;
         this.tweens.add({
           targets: sprite,
-          y: baseY - WAVE_HEIGHT,
-          duration: WAVE_DURATION,
-          delay: startDelay + index * WAVE_LETTER_DELAY,
+          y: baseY - settings.height,
+          duration,
+          delay: startDelay + index * letterDelay,
           ease: 'Sine.easeInOut',
           yoyo: true,
           onComplete: () => {
@@ -510,8 +609,8 @@
       });
 
       return startDelay
-        + (sprites.length - 1) * WAVE_LETTER_DELAY
-        + WAVE_DURATION * 2;
+        + (sprites.length - 1) * letterDelay
+        + duration * 2;
     }
 
     playLogoWave() {
@@ -527,18 +626,46 @@
       this.selectionFrame?.setVisible(false);
       showEditorStatus('Волна SPICE → CREAM');
 
-      const spiceEnd = this.queueWordWave('SPICE', 0);
-      const creamEnd = this.queueWordWave('CREAM', spiceEnd);
+      const settings = { ...waveSettings };
+      const spiceEnd = this.queueWordWave('SPICE', 0, settings);
+      const creamEnd = this.queueWordWave(
+        'CREAM',
+        settings.offset,
+        settings
+      );
+      const waveEnd = Math.max(spiceEnd, creamEnd);
 
-      this.time.delayedCall(creamEnd + 30, () => {
+      this.time.delayedCall(waveEnd + 30, () => {
         this.isWavePlaying = false;
-        this.waveButton
-          .setInteractive({ useHandCursor: true })
-          .setAlpha(1);
-        this.selectionFrame?.setVisible(true);
-        this.updateSelectionFrame();
-        showEditorStatus('Волна завершена');
+
+        if (waveSettings.loop) {
+          showEditorStatus('Постоянная волна');
+          this.time.delayedCall(80, () => {
+            if (waveSettings.loop) {
+              this.playLogoWave();
+              return;
+            }
+
+            this.restoreWaveButton();
+          });
+          return;
+        }
+
+        this.restoreWaveButton();
       });
+    }
+
+    restoreWaveButton() {
+      if (this.isWavePlaying) {
+        return;
+      }
+
+      this.waveButton
+        .setInteractive({ useHandCursor: true })
+        .setAlpha(1);
+      this.selectionFrame?.setVisible(true);
+      this.updateSelectionFrame();
+      showEditorStatus('Волна завершена');
     }
   }
 
@@ -562,11 +689,25 @@
 
   copyButton.addEventListener('click', copyLetterPositions);
   resetButton.addEventListener('click', resetWordPositions);
+  [waveSpeedInput, waveOffsetInput, waveHeightInput].forEach((input) => {
+    input.addEventListener('input', updateWaveSettingsFromControls);
+  });
+  waveLoopInput.addEventListener('change', () => {
+    updateWaveSettingsFromControls();
+
+    if (waveSettings.loop && scene && !scene.isWavePlaying) {
+      scene.playLogoWave();
+    } else if (!waveSettings.loop && scene && !scene.isWavePlaying) {
+      scene.restoreWaveButton();
+    }
+  });
+  syncWaveControls();
 
   window.spiceCreamEditor = {
     getPositions: getLetterPositions,
     resetPositions: resetWordPositions,
-    playWave: () => scene?.playLogoWave()
+    playWave: () => scene?.playLogoWave(),
+    getWaveSettings: () => ({ ...waveSettings })
   };
 
   if (!window.Phaser) {
