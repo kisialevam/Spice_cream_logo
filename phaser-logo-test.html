@@ -56,8 +56,10 @@
       z-index: 10;
       display: flex;
       width: min(360px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
       flex-direction: column;
       align-items: stretch;
+      overflow-y: auto;
       gap: 8px;
       padding: 8px;
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -103,7 +105,8 @@
       text-align: center;
     }
 
-    #wave-settings {
+    #wave-settings,
+    #sparkle-settings {
       display: grid;
       gap: 9px;
       margin: 0;
@@ -112,7 +115,8 @@
       border-radius: 9px;
     }
 
-    #wave-settings legend {
+    #wave-settings legend,
+    #sparkle-settings legend {
       padding: 0 6px;
       color: rgba(255, 255, 255, 0.85);
       font: 700 12px/1 Arial, sans-serif;
@@ -164,6 +168,7 @@
         bottom: max(8px, env(safe-area-inset-bottom));
         left: 8px;
         width: auto;
+        max-height: calc(100vh - 16px);
       }
 
       #editor-status {
@@ -203,9 +208,32 @@
         <span>Воспроизводить постоянно</span>
       </label>
     </fieldset>
+    <fieldset id="sparkle-settings">
+      <legend>Настройка звёздочек</legend>
+      <label class="wave-control" for="sparkle-count">
+        <span>Количество на экране</span>
+        <output id="sparkle-count-value" for="sparkle-count">1</output>
+        <input id="sparkle-count" type="range" min="0" max="6" step="1" value="1">
+      </label>
+      <label class="wave-control" for="sparkle-scale">
+        <span>Общий скейл</span>
+        <output id="sparkle-scale-value" for="sparkle-scale">1.00×</output>
+        <input id="sparkle-scale" type="range" min="0.5" max="2" step="0.05" value="1">
+      </label>
+      <label class="wave-control" for="sparkle-rotation-speed">
+        <span>Скорость вращения</span>
+        <output id="sparkle-rotation-speed-value" for="sparkle-rotation-speed">15°/с</output>
+        <input id="sparkle-rotation-speed" type="range" min="0" max="90" step="5" value="15">
+      </label>
+      <label class="wave-control" for="sparkle-pause">
+        <span>Пауза</span>
+        <output id="sparkle-pause-value" for="sparkle-pause">0 мс</output>
+        <input id="sparkle-pause" type="range" min="0" max="1500" step="50" value="0">
+      </label>
+    </fieldset>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="logo-builder.js?v=8"></script>
+  <script src="logo-builder.js?v=9"></script>
 </body>
 </html>

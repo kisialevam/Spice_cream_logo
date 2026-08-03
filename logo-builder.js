@@ -16,6 +16,13 @@
     height: BASE_WAVE_HEIGHT,
     loop: false
   };
+  const SPARKLE_SETTINGS_STORAGE_KEY = 'spice-cream-sparkle-settings-v1';
+  const DEFAULT_SPARKLE_SETTINGS = {
+    count: 1,
+    scale: 1,
+    rotationSpeed: 15,
+    pause: 0
+  };
 
   const ASSETS = [
     { key: 'letter-s', src: 's.png' },
@@ -57,11 +64,20 @@
   const waveSpeedValue = document.getElementById('wave-speed-value');
   const waveOffsetValue = document.getElementById('wave-offset-value');
   const waveHeightValue = document.getElementById('wave-height-value');
+  const sparkleCountInput = document.getElementById('sparkle-count');
+  const sparkleScaleInput = document.getElementById('sparkle-scale');
+  const sparkleRotationSpeedInput = document.getElementById('sparkle-rotation-speed');
+  const sparklePauseInput = document.getElementById('sparkle-pause');
+  const sparkleCountValue = document.getElementById('sparkle-count-value');
+  const sparkleScaleValue = document.getElementById('sparkle-scale-value');
+  const sparkleRotationSpeedValue = document.getElementById('sparkle-rotation-speed-value');
+  const sparklePauseValue = document.getElementById('sparkle-pause-value');
   const loadedImages = new Map();
 
   let scene = null;
   let statusTimer = null;
   let waveSettings = readWaveSettings();
+  let sparkleSettings = readSparkleSettings();
 
   function showMessage(text) {
     message.textContent = text;
@@ -163,6 +179,75 @@
     saveWaveSettings();
   }
 
+  function readSparkleSettings() {
+    try {
+      const saved = JSON.parse(
+        window.localStorage.getItem(SPARKLE_SETTINGS_STORAGE_KEY)
+      ) || {};
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      return {
+        count: Math.round(clamp(
+          Number.isFinite(Number(saved.count))
+            ? Number(saved.count)
+            : DEFAULT_SPARKLE_SETTINGS.count,
+          0,
+          6
+        )),
+        scale: clamp(
+          Number(saved.scale) || DEFAULT_SPARKLE_SETTINGS.scale,
+          0.5,
+          2
+        ),
+        rotationSpeed: clamp(
+          Number.isFinite(Number(saved.rotationSpeed))
+            ? Number(saved.rotationSpeed)
+            : DEFAULT_SPARKLE_SETTINGS.rotationSpeed,
+          0,
+          90
+        ),
+        pause: clamp(
+          Number.isFinite(Number(saved.pause))
+            ? Number(saved.pause)
+            : DEFAULT_SPARKLE_SETTINGS.pause,
+          0,
+          1500
+        )
+      };
+    } catch (error) {
+      return { ...DEFAULT_SPARKLE_SETTINGS };
+    }
+  }
+
+  function saveSparkleSettings() {
+    window.localStorage.setItem(
+      SPARKLE_SETTINGS_STORAGE_KEY,
+      JSON.stringify(sparkleSettings)
+    );
+  }
+
+  function syncSparkleControls() {
+    sparkleCountInput.value = sparkleSettings.count;
+    sparkleScaleInput.value = sparkleSettings.scale;
+    sparkleRotationSpeedInput.value = sparkleSettings.rotationSpeed;
+    sparklePauseInput.value = sparkleSettings.pause;
+    sparkleCountValue.textContent = String(sparkleSettings.count);
+    sparkleScaleValue.textContent = `${sparkleSettings.scale.toFixed(2)}×`;
+    sparkleRotationSpeedValue.textContent = `${Math.round(sparkleSettings.rotationSpeed)}°/с`;
+    sparklePauseValue.textContent = `${Math.round(sparkleSettings.pause)} мс`;
+  }
+
+  function updateSparkleSettingsFromControls() {
+    sparkleSettings = {
+      count: Number(sparkleCountInput.value),
+      scale: Number(sparkleScaleInput.value),
+      rotationSpeed: Number(sparkleRotationSpeedInput.value),
+      pause: Number(sparklePauseInput.value)
+    };
+    syncSparkleControls();
+    saveSparkleSettings();
+  }
+
   function getLetterPositions() {
     if (!scene) {
       return [];
@@ -239,6 +324,7 @@
       scene = this;
       window.transitionScene = this;
       this.letterSprites = new Map();
+      this.sparkleChannels = new Set();
       this.selectedWord = null;
       this.selectionFrame = null;
       this.dragState = null;
@@ -351,7 +437,7 @@
       });
 
       this.createWaveButton();
-      this.scheduleSparkle();
+      this.syncSparkleChannels();
 
       if (waveSettings.loop) {
         this.time.delayedCall(250, () => this.playLogoWave());
@@ -526,7 +612,7 @@
       );
     }
 
-    spawnSparkle() {
+    spawnSparkle(onComplete) {
       const bounds = this.getLogoBounds();
       const x = Phaser.Math.FloatBetween(bounds.left - 12, bounds.right + 12);
       const y = Phaser.Math.FloatBetween(bounds.top - 12, bounds.bottom + 12);
@@ -535,10 +621,14 @@
         y,
         Phaser.Utils.Array.GetRandom(SPARK_TEXTURES)
       );
-      const targetScale = Phaser.Math.FloatBetween(1.15, 2.2);
+      const settings = { ...sparkleSettings };
+      const targetScale = Phaser.Math.FloatBetween(1.15, 2.2)
+        * settings.scale;
       const startAngle = Phaser.Math.Between(0, 359);
-      const rotation = Phaser.Math.Between(4, 12)
-        * (Math.random() < 0.5 ? -1 : 1);
+      const growDuration = Phaser.Math.Between(260, 480);
+      const shrinkDuration = Phaser.Math.Between(240, 420);
+      const totalDuration = growDuration + settings.pause + shrinkDuration;
+      const totalRotation = settings.rotationSpeed * totalDuration / 1000;
 
       sparkle
         .setDepth(50)
@@ -549,30 +639,72 @@
 
       this.tweens.add({
         targets: sparkle,
+        angle: startAngle + totalRotation,
+        duration: totalDuration,
+        ease: 'Linear'
+      });
+
+      this.tweens.add({
+        targets: sparkle,
         scaleX: targetScale,
         scaleY: targetScale,
-        angle: startAngle + rotation * 0.5,
-        duration: Phaser.Math.Between(260, 480),
+        duration: growDuration,
         ease: 'Sine.easeOut',
         onComplete: () => {
-          this.tweens.add({
-            targets: sparkle,
-            scaleX: 0,
-            scaleY: 0,
-            angle: startAngle + rotation,
-            duration: Phaser.Math.Between(240, 420),
-            ease: 'Sine.easeIn',
-            onComplete: () => sparkle.destroy()
-          });
+          const shrinkSparkle = () => {
+            this.tweens.add({
+              targets: sparkle,
+              scaleX: 0,
+              scaleY: 0,
+              duration: shrinkDuration,
+              ease: 'Sine.easeIn',
+              onComplete: () => {
+                sparkle.destroy();
+                onComplete?.();
+              }
+            });
+          };
+
+          if (settings.pause === 0) {
+            shrinkSparkle();
+            return;
+          }
+
+          this.time.delayedCall(settings.pause, shrinkSparkle);
         }
       });
     }
 
-    scheduleSparkle() {
-      this.time.delayedCall(Phaser.Math.Between(850, 1500), () => {
-        this.spawnSparkle();
-        this.scheduleSparkle();
+    scheduleSparkleChannel(channelIndex, delay) {
+      this.time.delayedCall(delay, () => {
+        if (channelIndex >= sparkleSettings.count) {
+          this.sparkleChannels.delete(channelIndex);
+          return;
+        }
+
+        this.spawnSparkle(() => {
+          if (channelIndex >= sparkleSettings.count) {
+            this.sparkleChannels.delete(channelIndex);
+            return;
+          }
+
+          this.scheduleSparkleChannel(
+            channelIndex,
+            Phaser.Math.Between(180, 520)
+          );
+        });
       });
+    }
+
+    syncSparkleChannels() {
+      for (let index = 0; index < sparkleSettings.count; index += 1) {
+        if (this.sparkleChannels.has(index)) {
+          continue;
+        }
+
+        this.sparkleChannels.add(index);
+        this.scheduleSparkleChannel(index, Phaser.Math.Between(120, 850));
+      }
     }
 
     queueWordWave(word, startDelay, settings) {
@@ -689,12 +821,25 @@
     }
   });
   syncWaveControls();
+  [
+    sparkleCountInput,
+    sparkleScaleInput,
+    sparkleRotationSpeedInput,
+    sparklePauseInput
+  ].forEach((input) => {
+    input.addEventListener('input', () => {
+      updateSparkleSettingsFromControls();
+      scene?.syncSparkleChannels();
+    });
+  });
+  syncSparkleControls();
 
   window.spiceCreamEditor = {
     getPositions: getLetterPositions,
     resetPositions: resetWordPositions,
     playWave: () => scene?.playLogoWave(),
-    getWaveSettings: () => ({ ...waveSettings })
+    getWaveSettings: () => ({ ...waveSettings }),
+    getSparkleSettings: () => ({ ...sparkleSettings })
   };
 
   if (!window.Phaser) {
