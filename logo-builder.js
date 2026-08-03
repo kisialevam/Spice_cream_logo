@@ -5,21 +5,20 @@
   const SCREEN_HEIGHT = 2048;
   const KEYBOARD_STEP = 1;
   const KEYBOARD_FAST_STEP = 10;
-  const BASE_WAVE_HEIGHT = 48;
   const BASE_WAVE_DURATION = 260;
   const BASE_WAVE_LETTER_DELAY = 90;
   const STORAGE_KEY = 'spice-cream-word-layout-v2';
-  const WAVE_SETTINGS_STORAGE_KEY = 'spice-cream-wave-settings-v1';
+  const WAVE_SETTINGS_STORAGE_KEY = 'spice-cream-wave-settings-v2';
   const DEFAULT_WAVE_SETTINGS = {
     speed: 1,
-    offset: 880,
-    height: BASE_WAVE_HEIGHT,
+    offset: 420,
+    height: 34,
     loop: false
   };
-  const SPARKLE_SETTINGS_STORAGE_KEY = 'spice-cream-sparkle-settings-v1';
+  const SPARKLE_SETTINGS_STORAGE_KEY = 'spice-cream-sparkle-settings-v2';
   const DEFAULT_SPARKLE_SETTINGS = {
-    count: 1,
-    scale: 1,
+    count: 2,
+    scale: 0.75,
     rotationSpeed: 15,
     pause: 0
   };
