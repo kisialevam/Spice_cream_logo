@@ -3,17 +3,14 @@
 
   const SCREEN_WIDTH = 1080;
   const SCREEN_HEIGHT = 2048;
-  const REFERENCE_OPACITY = 0.5;
   const KEYBOARD_STEP = 1;
   const KEYBOARD_FAST_STEP = 10;
   const WAVE_HEIGHT = 48;
   const WAVE_DURATION = 260;
   const WAVE_LETTER_DELAY = 90;
-  const WAVE_WORD_GAP = 150;
   const STORAGE_KEY = 'spice-cream-word-layout-v2';
 
   const ASSETS = [
-    { key: 'reference-logo', src: 'logo_big.png' },
     { key: 'letter-s', src: 's.png' },
     { key: 'letter-p', src: 'p.png' },
     { key: 'letter-i', src: 'i.png' },
@@ -21,8 +18,13 @@
     { key: 'letter-e', src: 'e.png' },
     { key: 'letter-r', src: 'r.png' },
     { key: 'letter-a', src: 'a.png' },
-    { key: 'letter-m', src: 'm.png' }
+    { key: 'letter-m', src: 'm.png' },
+    { key: 'spark-1', src: 'spark1.png' },
+    { key: 'spark-2', src: 'spark2.png' },
+    { key: 'spark-3', src: 'spark3.png' }
   ];
+
+  const SPARK_TEXTURES = ['spark-1', 'spark-2', 'spark-3'];
 
   const LETTERS = [
     { id: 'spice-s', word: 'SPICE', letter: 'S', texture: 'letter-s', x: 402, y: 986 },
@@ -39,7 +41,6 @@
 
   const message = document.getElementById('message');
   const copyButton = document.getElementById('copy-positions');
-  const waveButton = document.getElementById('play-wave');
   const resetButton = document.getElementById('reset-positions');
   const editorStatus = document.getElementById('editor-status');
   const loadedImages = new Map();
@@ -144,6 +145,7 @@
     });
 
     scene.updateSelectionFrame();
+    scene.updateWaveButtonPosition();
     showEditorStatus('Сброшено');
   }
 
@@ -169,19 +171,6 @@
       ASSETS.forEach((asset) => {
         this.textures.addImage(asset.key, loadedImages.get(asset.key));
       });
-
-      const referenceLogo = this.add.image(
-        SCREEN_WIDTH / 2,
-        SCREEN_HEIGHT / 2,
-        'reference-logo'
-      );
-
-      const maxLogoWidth = SCREEN_WIDTH * 0.86;
-      const referenceScale = Math.min(1, maxLogoWidth / referenceLogo.width);
-      referenceLogo
-        .setScale(referenceScale)
-        .setAlpha(REFERENCE_OPACITY)
-        .setDepth(1);
 
       const savedPositions = readSavedPositions();
 
@@ -269,6 +258,7 @@
         });
         this.dragState = null;
         this.updateSelectionFrame();
+        this.updateWaveButtonPosition();
         saveLetterPositions();
       });
 
@@ -282,6 +272,9 @@
       this.input.keyboard.on('keydown', (event) => {
         this.moveSelectedWord(event);
       });
+
+      this.createWaveButton();
+      this.scheduleSparkle();
     }
 
     getWordSprites(word) {
@@ -298,6 +291,18 @@
         right: Math.max(...sprites.map((sprite) => sprite.x + sprite.displayWidth / 2)),
         top: Math.min(...sprites.map((sprite) => sprite.y - sprite.displayHeight / 2)),
         bottom: Math.max(...sprites.map((sprite) => sprite.y + sprite.displayHeight / 2))
+      };
+    }
+
+    getLogoBounds() {
+      const spiceBounds = this.getWordBounds('SPICE');
+      const creamBounds = this.getWordBounds('CREAM');
+
+      return {
+        left: Math.min(spiceBounds.left, creamBounds.left),
+        right: Math.max(spiceBounds.right, creamBounds.right),
+        top: Math.min(spiceBounds.top, creamBounds.top),
+        bottom: Math.max(spiceBounds.bottom, creamBounds.bottom)
       };
     }
 
@@ -394,8 +399,104 @@
       });
 
       this.updateSelectionFrame();
+      this.updateWaveButtonPosition();
       saveLetterPositions();
       showEditorStatus(this.selectedWord);
+    }
+
+    createWaveButton() {
+      this.waveButton = this.add.text(0, 0, 'waaaaveee', {
+        fontFamily: 'Arial Black, Arial, sans-serif',
+        fontSize: '44px',
+        color: '#ffffff',
+        backgroundColor: '#d83d88',
+        stroke: '#761347',
+        strokeThickness: 4,
+        padding: {
+          x: 28,
+          y: 14
+        }
+      });
+
+      this.waveButton
+        .setOrigin(0.5)
+        .setDepth(70)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerover', () => {
+          if (!this.isWavePlaying) {
+            this.waveButton.setScale(1.04);
+          }
+        })
+        .on('pointerout', () => this.waveButton.setScale(1))
+        .on('pointerdown', () => this.playLogoWave());
+
+      this.updateWaveButtonPosition();
+    }
+
+    updateWaveButtonPosition() {
+      if (!this.waveButton) {
+        return;
+      }
+
+      const bounds = this.getLogoBounds();
+      this.waveButton.setPosition(
+        (bounds.left + bounds.right) / 2,
+        bounds.bottom + 100
+      );
+    }
+
+    spawnSparkle() {
+      const target = Phaser.Utils.Array.GetRandom(
+        Array.from(this.letterSprites.values())
+      );
+      const x = target.x + Phaser.Math.FloatBetween(
+        -target.displayWidth * 0.36,
+        target.displayWidth * 0.36
+      );
+      const y = target.y + Phaser.Math.FloatBetween(
+        -target.displayHeight * 0.34,
+        target.displayHeight * 0.34
+      );
+      const sparkle = this.add.image(
+        x,
+        y,
+        Phaser.Utils.Array.GetRandom(SPARK_TEXTURES)
+      );
+      const targetScale = Phaser.Math.FloatBetween(0.8, 1.65);
+
+      sparkle
+        .setDepth(50)
+        .setAlpha(0)
+        .setScale(0)
+        .setAngle(Phaser.Math.Between(0, 359))
+        .setBlendMode(Phaser.BlendModes.ADD);
+
+      this.tweens.add({
+        targets: sparkle,
+        alpha: 1,
+        scaleX: targetScale,
+        scaleY: targetScale,
+        duration: Phaser.Math.Between(70, 115),
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          this.tweens.add({
+            targets: sparkle,
+            alpha: 0,
+            scaleX: targetScale * 1.22,
+            scaleY: targetScale * 1.22,
+            duration: Phaser.Math.Between(120, 190),
+            ease: 'Quad.easeIn',
+            onComplete: () => sparkle.destroy()
+          });
+        }
+      });
+    }
+
+    scheduleSparkle() {
+      this.time.delayedCall(Phaser.Math.Between(150, 380), () => {
+        this.spawnSparkle();
+        this.scheduleSparkle();
+      });
     }
 
     queueWordWave(word, startDelay) {
@@ -427,16 +528,21 @@
       }
 
       this.isWavePlaying = true;
-      waveButton.disabled = true;
+      this.waveButton
+        .disableInteractive()
+        .setAlpha(0.55)
+        .setScale(1);
       this.selectionFrame?.setVisible(false);
       showEditorStatus('Волна SPICE → CREAM');
 
       const spiceEnd = this.queueWordWave('SPICE', 0);
-      const creamEnd = this.queueWordWave('CREAM', spiceEnd + WAVE_WORD_GAP);
+      const creamEnd = this.queueWordWave('CREAM', spiceEnd);
 
       this.time.delayedCall(creamEnd + 30, () => {
         this.isWavePlaying = false;
-        waveButton.disabled = false;
+        this.waveButton
+          .setInteractive({ useHandCursor: true })
+          .setAlpha(1);
         this.selectionFrame?.setVisible(true);
         this.updateSelectionFrame();
         showEditorStatus('Волна завершена');
@@ -463,7 +569,6 @@
   }
 
   copyButton.addEventListener('click', copyLetterPositions);
-  waveButton.addEventListener('click', () => scene?.playLogoWave());
   resetButton.addEventListener('click', resetWordPositions);
 
   window.spiceCreamEditor = {
