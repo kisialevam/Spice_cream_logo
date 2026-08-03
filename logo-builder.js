@@ -537,7 +537,7 @@
       );
       const targetScale = Phaser.Math.FloatBetween(1.15, 2.2);
       const startAngle = Phaser.Math.Between(0, 359);
-      const rotation = Phaser.Math.Between(30, 95)
+      const rotation = Phaser.Math.Between(4, 12)
         * (Math.random() < 0.5 ? -1 : 1);
 
       sparkle
@@ -551,39 +551,26 @@
         targets: sparkle,
         scaleX: targetScale,
         scaleY: targetScale,
-        angle: startAngle + rotation * 0.55,
+        angle: startAngle + rotation * 0.5,
         duration: Phaser.Math.Between(260, 480),
         ease: 'Sine.easeOut',
         onComplete: () => {
-          this.time.delayedCall(Phaser.Math.Between(80, 320), () => {
-            this.tweens.add({
-              targets: sparkle,
-              scaleX: 0,
-              scaleY: 0,
-              angle: startAngle + rotation,
-              duration: Phaser.Math.Between(240, 420),
-              ease: 'Sine.easeIn',
-              onComplete: () => sparkle.destroy()
-            });
+          this.tweens.add({
+            targets: sparkle,
+            scaleX: 0,
+            scaleY: 0,
+            angle: startAngle + rotation,
+            duration: Phaser.Math.Between(240, 420),
+            ease: 'Sine.easeIn',
+            onComplete: () => sparkle.destroy()
           });
         }
       });
     }
 
-    spawnSparkleBurst() {
-      const roll = Math.random();
-      const count = roll < 0.5 ? 1 : roll < 0.84 ? 2 : 3;
-
-      for (let index = 0; index < count; index += 1) {
-        this.time.delayedCall(Phaser.Math.Between(0, 700), () => {
-          this.spawnSparkle();
-        });
-      }
-    }
-
     scheduleSparkle() {
-      this.time.delayedCall(Phaser.Math.Between(1400, 3400), () => {
-        this.spawnSparkleBurst();
+      this.time.delayedCall(Phaser.Math.Between(850, 1500), () => {
+        this.spawnSparkle();
         this.scheduleSparkle();
       });
     }
