@@ -6,6 +6,10 @@
   const REFERENCE_OPACITY = 0.5;
   const KEYBOARD_STEP = 1;
   const KEYBOARD_FAST_STEP = 10;
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 5;
+  const ZOOM_STEP = 0.25;
+  const WHEEL_ZOOM_STEP = 0.15;
   const STORAGE_KEY = 'spice-cream-letter-layout-v1';
 
   const ASSETS = [
@@ -21,22 +25,25 @@
   ];
 
   const LETTERS = [
-    { id: 'spice-s', letter: 'S', texture: 'letter-s', x: 140, y: 300 },
-    { id: 'spice-p', letter: 'P', texture: 'letter-p', x: 340, y: 300 },
-    { id: 'spice-i', letter: 'I', texture: 'letter-i', x: 540, y: 300 },
-    { id: 'spice-c', letter: 'C', texture: 'letter-c', x: 740, y: 300 },
-    { id: 'spice-e', letter: 'E', texture: 'letter-e', x: 940, y: 300 },
-    { id: 'cream-c', letter: 'C', texture: 'letter-c', x: 140, y: 1748 },
-    { id: 'cream-r', letter: 'R', texture: 'letter-r', x: 340, y: 1748 },
-    { id: 'cream-e', letter: 'E', texture: 'letter-e', x: 540, y: 1748 },
-    { id: 'cream-a', letter: 'A', texture: 'letter-a', x: 740, y: 1748 },
-    { id: 'cream-m', letter: 'M', texture: 'letter-m', x: 940, y: 1748 }
+    { id: 'spice-s', letter: 'S', texture: 'letter-s', x: 402, y: 986 },
+    { id: 'spice-p', letter: 'P', texture: 'letter-p', x: 484, y: 981 },
+    { id: 'spice-i', letter: 'I', texture: 'letter-i', x: 550, y: 977 },
+    { id: 'spice-c', letter: 'C', texture: 'letter-c', x: 613, y: 972 },
+    { id: 'spice-e', letter: 'E', texture: 'letter-e', x: 694, y: 966 },
+    { id: 'cream-c', letter: 'C', texture: 'letter-c', x: 374, y: 1081 },
+    { id: 'cream-r', letter: 'R', texture: 'letter-r', x: 457, y: 1074 },
+    { id: 'cream-e', letter: 'E', texture: 'letter-e', x: 537, y: 1068 },
+    { id: 'cream-a', letter: 'A', texture: 'letter-a', x: 619, y: 1062 },
+    { id: 'cream-m', letter: 'M', texture: 'letter-m', x: 702, y: 1057 }
   ];
 
   const message = document.getElementById('message');
   const copyButton = document.getElementById('copy-positions');
   const resetButton = document.getElementById('reset-positions');
   const editorStatus = document.getElementById('editor-status');
+  const zoomOutButton = document.getElementById('zoom-out');
+  const zoomResetButton = document.getElementById('zoom-reset');
+  const zoomInButton = document.getElementById('zoom-in');
   const loadedImages = new Map();
 
   let scene = null;
@@ -132,6 +139,16 @@
     showEditorStatus('Сброшено');
   }
 
+  function getLetterDepth(definition) {
+    return definition.id.startsWith('spice-') ? 10 : 20;
+  }
+
+  function changeZoom(delta) {
+    if (scene) {
+      scene.setEditorZoom(scene.cameras.main.zoom + delta);
+    }
+  }
+
   class TransitionScene extends Phaser.Scene {
     constructor() {
       super('TransitionScene');
@@ -173,7 +190,7 @@
         );
 
         sprite
-          .setDepth(10)
+          .setDepth(getLetterDepth(definition))
           .setName(definition.id)
           .setData('definition', definition)
           .setInteractive({ useHandCursor: true });
@@ -202,7 +219,6 @@
       this.input.on('dragend', (pointer, sprite) => {
         sprite
           .setPosition(Math.round(sprite.x), Math.round(sprite.y))
-          .setDepth(100)
           .setAlpha(1);
         this.updateSelectionFrame();
         saveLetterPositions();
@@ -218,15 +234,25 @@
       this.input.keyboard.on('keydown', (event) => {
         this.moveSelectedLetter(event);
       });
+
+      this.input.on('wheel', (
+        pointer,
+        gameObjects,
+        deltaX,
+        deltaY,
+        deltaZ,
+        event
+      ) => {
+        const direction = deltaY > 0 ? -1 : 1;
+        this.setEditorZoom(
+          this.cameras.main.zoom + direction * WHEEL_ZOOM_STEP
+        );
+        event?.preventDefault();
+      });
     }
 
     selectLetter(sprite) {
-      if (this.selectedLetter && this.selectedLetter !== sprite) {
-        this.selectedLetter.setDepth(10);
-      }
-
       this.selectedLetter = sprite;
-      sprite.setDepth(100);
 
       if (this.selectionFrame) {
         this.selectionFrame.destroy();
@@ -248,6 +274,17 @@
       const definition = sprite.getData('definition');
       const word = definition.id.startsWith('spice-') ? 'SPICE' : 'CREAM';
       showEditorStatus(`${word} · ${definition.letter}`);
+    }
+
+    setEditorZoom(value) {
+      const zoom = Phaser.Math.Clamp(value, MIN_ZOOM, MAX_ZOOM);
+
+      this.cameras.main
+        .setZoom(zoom)
+        .centerOn(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+
+      zoomResetButton.textContent = `${Math.round(zoom * 100)}%`;
+      showEditorStatus(`Масштаб ${Math.round(zoom * 100)}%`);
     }
 
     updateSelectionFrame() {
@@ -317,6 +354,13 @@
 
   copyButton.addEventListener('click', copyLetterPositions);
   resetButton.addEventListener('click', resetLetterPositions);
+  zoomOutButton.addEventListener('click', () => changeZoom(-ZOOM_STEP));
+  zoomInButton.addEventListener('click', () => changeZoom(ZOOM_STEP));
+  zoomResetButton.addEventListener('click', () => {
+    if (scene) {
+      scene.setEditorZoom(1);
+    }
+  });
 
   window.spiceCreamEditor = {
     getPositions: getLetterPositions,
