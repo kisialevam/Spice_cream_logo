@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+  <title>Spice Cream — тест экрана перехода</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #09070d;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    #game {
+      width: 100%;
+      height: 100%;
+    }
+
+    #game canvas {
+      display: block;
+      margin: auto;
+    }
+
+    #message {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 32px;
+      color: #fff;
+      font: 20px/1.5 Arial, sans-serif;
+      text-align: center;
+      background: #09070d;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="message" role="alert"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script>
+    const SCREEN_WIDTH = 1080;
+    const SCREEN_HEIGHT = 2048;
+    const LOGO_PATH = 'git_hub_repo/Spice_cream_logo/logo_small.png';
+
+    const message = document.getElementById('message');
+    const logoSource = new Image();
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.style.display = 'grid';
+    }
+
+    if (!window.Phaser) {
+      showMessage(
+        'Не удалось загрузить Phaser. Проверьте подключение к интернету и обновите страницу.'
+      );
+      throw new Error('Phaser did not load.');
+    }
+
+    class TransitionScene extends Phaser.Scene {
+      constructor() {
+        super('TransitionScene');
+      }
+
+      create() {
+        this.cameras.main.setBackgroundColor('#24152f');
+        this.textures.addImage('spice-cream-logo', logoSource);
+
+        const logo = this.add.image(
+          SCREEN_WIDTH / 2,
+          SCREEN_HEIGHT / 2,
+          'spice-cream-logo'
+        );
+
+        const maxLogoWidth = SCREEN_WIDTH * 0.86;
+        const scale = Math.min(1, maxLogoWidth / logo.width);
+        logo.setScale(scale);
+      }
+    }
+
+    function startGame() {
+      new Phaser.Game({
+        type: Phaser.AUTO,
+        parent: 'game',
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        backgroundColor: '#24152f',
+        scene: TransitionScene,
+        scale: {
+          mode: Phaser.Scale.FIT,
+          autoCenter: Phaser.Scale.CENTER_BOTH
+        }
+      });
+    }
+
+    logoSource.addEventListener('load', startGame, { once: true });
+    logoSource.addEventListener('error', () => {
+      showMessage(`Не удалось загрузить изображение: ${LOGO_PATH}`);
+    }, { once: true });
+    logoSource.src = LOGO_PATH;
+  </script>
+</body>
+</html>
