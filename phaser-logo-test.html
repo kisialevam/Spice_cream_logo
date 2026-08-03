@@ -64,23 +64,7 @@
       backdrop-filter: blur(8px);
     }
 
-    #zoom-controls {
-      position: fixed;
-      top: max(12px, env(safe-area-inset-top));
-      left: max(12px, env(safe-area-inset-left));
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      background: rgba(9, 7, 13, 0.78);
-      backdrop-filter: blur(8px);
-    }
-
-    #editor-controls button,
-    #zoom-controls button {
+    #editor-controls button {
       padding: 9px 12px;
       border: 0;
       border-radius: 8px;
@@ -90,25 +74,18 @@
       background: #d83d88;
     }
 
-    #editor-controls button:hover,
-    #zoom-controls button:hover {
+    #editor-controls button:hover {
       background: #ed4e9b;
     }
 
-    #editor-controls button:focus-visible,
-    #zoom-controls button:focus-visible {
+    #editor-controls button:focus-visible {
       outline: 3px solid #ffffff;
       outline-offset: 2px;
     }
 
-    #zoom-controls button {
-      min-width: 42px;
-      font-size: 17px;
-    }
-
-    #zoom-reset {
-      min-width: 66px !important;
-      font-size: 13px !important;
+    #editor-controls button:disabled {
+      opacity: 0.55;
+      cursor: wait;
     }
 
     #editor-status {
@@ -130,29 +107,20 @@
       #editor-status {
         display: none;
       }
-
-      #zoom-controls {
-        top: max(8px, env(safe-area-inset-top));
-        left: 8px;
-      }
     }
   </style>
 </head>
 <body>
   <div id="game"></div>
   <div id="message" role="alert"></div>
-  <div id="zoom-controls" aria-label="Масштаб сцены">
-    <button id="zoom-out" type="button" aria-label="Уменьшить масштаб">−</button>
-    <button id="zoom-reset" type="button" aria-label="Сбросить масштаб">100%</button>
-    <button id="zoom-in" type="button" aria-label="Увеличить масштаб">+</button>
-  </div>
-  <div id="editor-controls" aria-label="Управление редактором букв">
+  <div id="editor-controls" aria-label="Управление словами">
     <button id="copy-positions" type="button">Скопировать позиции</button>
+    <button id="play-wave" type="button">Запустить волну</button>
     <button id="reset-positions" type="button">Сбросить</button>
-    <span id="editor-status" aria-live="polite">Клик → стрелки</span>
+    <span id="editor-status" aria-live="polite">Клик → слово</span>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="logo-builder.js?v=3"></script>
+  <script src="logo-builder.js?v=4"></script>
 </body>
 </html>

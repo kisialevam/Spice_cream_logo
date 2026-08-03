@@ -6,11 +6,11 @@
   const REFERENCE_OPACITY = 0.5;
   const KEYBOARD_STEP = 1;
   const KEYBOARD_FAST_STEP = 10;
-  const MIN_ZOOM = 1;
-  const MAX_ZOOM = 5;
-  const ZOOM_STEP = 0.25;
-  const WHEEL_ZOOM_STEP = 0.15;
-  const STORAGE_KEY = 'spice-cream-letter-layout-v1';
+  const WAVE_HEIGHT = 48;
+  const WAVE_DURATION = 260;
+  const WAVE_LETTER_DELAY = 90;
+  const WAVE_WORD_GAP = 150;
+  const STORAGE_KEY = 'spice-cream-word-layout-v2';
 
   const ASSETS = [
     { key: 'reference-logo', src: 'logo_big.png' },
@@ -25,25 +25,23 @@
   ];
 
   const LETTERS = [
-    { id: 'spice-s', letter: 'S', texture: 'letter-s', x: 402, y: 986 },
-    { id: 'spice-p', letter: 'P', texture: 'letter-p', x: 484, y: 981 },
-    { id: 'spice-i', letter: 'I', texture: 'letter-i', x: 550, y: 977 },
-    { id: 'spice-c', letter: 'C', texture: 'letter-c', x: 613, y: 972 },
-    { id: 'spice-e', letter: 'E', texture: 'letter-e', x: 694, y: 966 },
-    { id: 'cream-c', letter: 'C', texture: 'letter-c', x: 374, y: 1081 },
-    { id: 'cream-r', letter: 'R', texture: 'letter-r', x: 457, y: 1074 },
-    { id: 'cream-e', letter: 'E', texture: 'letter-e', x: 537, y: 1068 },
-    { id: 'cream-a', letter: 'A', texture: 'letter-a', x: 619, y: 1062 },
-    { id: 'cream-m', letter: 'M', texture: 'letter-m', x: 702, y: 1057 }
+    { id: 'spice-s', word: 'SPICE', letter: 'S', texture: 'letter-s', x: 402, y: 986 },
+    { id: 'spice-p', word: 'SPICE', letter: 'P', texture: 'letter-p', x: 484, y: 981 },
+    { id: 'spice-i', word: 'SPICE', letter: 'I', texture: 'letter-i', x: 550, y: 977 },
+    { id: 'spice-c', word: 'SPICE', letter: 'C', texture: 'letter-c', x: 613, y: 972 },
+    { id: 'spice-e', word: 'SPICE', letter: 'E', texture: 'letter-e', x: 694, y: 966 },
+    { id: 'cream-c', word: 'CREAM', letter: 'C', texture: 'letter-c', x: 374, y: 1081 },
+    { id: 'cream-r', word: 'CREAM', letter: 'R', texture: 'letter-r', x: 457, y: 1074 },
+    { id: 'cream-e', word: 'CREAM', letter: 'E', texture: 'letter-e', x: 537, y: 1068 },
+    { id: 'cream-a', word: 'CREAM', letter: 'A', texture: 'letter-a', x: 619, y: 1062 },
+    { id: 'cream-m', word: 'CREAM', letter: 'M', texture: 'letter-m', x: 702, y: 1057 }
   ];
 
   const message = document.getElementById('message');
   const copyButton = document.getElementById('copy-positions');
+  const waveButton = document.getElementById('play-wave');
   const resetButton = document.getElementById('reset-positions');
   const editorStatus = document.getElementById('editor-status');
-  const zoomOutButton = document.getElementById('zoom-out');
-  const zoomResetButton = document.getElementById('zoom-reset');
-  const zoomInButton = document.getElementById('zoom-in');
   const loadedImages = new Map();
 
   let scene = null;
@@ -58,7 +56,7 @@
     editorStatus.textContent = text;
     window.clearTimeout(statusTimer);
     statusTimer = window.setTimeout(() => {
-      editorStatus.textContent = 'Клик → стрелки';
+      editorStatus.textContent = 'Клик → слово';
     }, 1600);
   }
 
@@ -114,6 +112,11 @@
   }
 
   async function copyLetterPositions() {
+    if (scene?.isWavePlaying) {
+      showEditorStatus('Дождись конца волны');
+      return;
+    }
+
     const text = JSON.stringify(getLetterPositions(), null, 2);
 
     try {
@@ -124,8 +127,13 @@
     }
   }
 
-  function resetLetterPositions() {
-    if (!scene || !window.confirm('Сбросить все буквы в начальные позиции?')) {
+  function resetWordPositions() {
+    if (!scene || scene.isWavePlaying) {
+      showEditorStatus('Дождись конца волны');
+      return;
+    }
+
+    if (!window.confirm('Вернуть оба слова в зафиксированные позиции?')) {
       return;
     }
 
@@ -140,13 +148,7 @@
   }
 
   function getLetterDepth(definition) {
-    return definition.id.startsWith('spice-') ? 10 : 20;
-  }
-
-  function changeZoom(delta) {
-    if (scene) {
-      scene.setEditorZoom(scene.cameras.main.zoom + delta);
-    }
+    return definition.word === 'SPICE' ? 10 : 20;
   }
 
   class TransitionScene extends Phaser.Scene {
@@ -158,8 +160,10 @@
       scene = this;
       window.transitionScene = this;
       this.letterSprites = new Map();
-      this.selectedLetter = null;
+      this.selectedWord = null;
       this.selectionFrame = null;
+      this.dragState = null;
+      this.isWavePlaying = false;
       this.cameras.main.setBackgroundColor('#24152f');
 
       ASSETS.forEach((asset) => {
@@ -193,33 +197,77 @@
           .setDepth(getLetterDepth(definition))
           .setName(definition.id)
           .setData('definition', definition)
+          .setData('word', definition.word)
           .setInteractive({ useHandCursor: true });
 
         this.input.setDraggable(sprite);
         this.letterSprites.set(definition.id, sprite);
 
         sprite.on('pointerdown', () => {
-          this.selectLetter(sprite);
+          if (!this.isWavePlaying) {
+            this.selectWord(definition.word);
+          }
         });
       });
 
       this.input.on('dragstart', (pointer, sprite) => {
-        this.selectLetter(sprite);
-        sprite.setAlpha(0.82);
+        if (this.isWavePlaying) {
+          return;
+        }
+
+        const word = sprite.getData('word');
+        const wordSprites = this.getWordSprites(word);
+        this.selectWord(word);
+        this.dragState = {
+          word,
+          draggedStartX: sprite.x,
+          draggedStartY: sprite.y,
+          positions: wordSprites.map((wordSprite) => ({
+            sprite: wordSprite,
+            x: wordSprite.x,
+            y: wordSprite.y
+          }))
+        };
+
+        wordSprites.forEach((wordSprite) => wordSprite.setAlpha(0.82));
       });
 
       this.input.on('drag', (pointer, sprite, dragX, dragY) => {
-        sprite.setPosition(
-          Phaser.Math.Clamp(dragX, 0, SCREEN_WIDTH),
-          Phaser.Math.Clamp(dragY, 0, SCREEN_HEIGHT)
+        if (!this.dragState) {
+          return;
+        }
+
+        const requestedX = dragX - this.dragState.draggedStartX;
+        const requestedY = dragY - this.dragState.draggedStartY;
+        const delta = this.clampWordDelta(
+          this.dragState.positions,
+          requestedX,
+          requestedY
         );
+
+        this.dragState.positions.forEach((position) => {
+          position.sprite.setPosition(
+            position.x + delta.x,
+            position.y + delta.y
+          );
+        });
         this.updateSelectionFrame();
       });
 
-      this.input.on('dragend', (pointer, sprite) => {
-        sprite
-          .setPosition(Math.round(sprite.x), Math.round(sprite.y))
-          .setAlpha(1);
+      this.input.on('dragend', () => {
+        if (!this.dragState) {
+          return;
+        }
+
+        this.dragState.positions.forEach((position) => {
+          position.sprite
+            .setPosition(
+              Math.round(position.sprite.x),
+              Math.round(position.sprite.y)
+            )
+            .setAlpha(1);
+        });
+        this.dragState = null;
         this.updateSelectionFrame();
         saveLetterPositions();
       });
@@ -232,37 +280,60 @@
       ]);
 
       this.input.keyboard.on('keydown', (event) => {
-        this.moveSelectedLetter(event);
-      });
-
-      this.input.on('wheel', (
-        pointer,
-        gameObjects,
-        deltaX,
-        deltaY,
-        deltaZ,
-        event
-      ) => {
-        const direction = deltaY > 0 ? -1 : 1;
-        this.setEditorZoom(
-          this.cameras.main.zoom + direction * WHEEL_ZOOM_STEP
-        );
-        event?.preventDefault();
+        this.moveSelectedWord(event);
       });
     }
 
-    selectLetter(sprite) {
-      this.selectedLetter = sprite;
+    getWordSprites(word) {
+      return LETTERS
+        .filter((definition) => definition.word === word)
+        .map((definition) => this.letterSprites.get(definition.id));
+    }
+
+    getWordBounds(word) {
+      const sprites = this.getWordSprites(word);
+
+      return {
+        left: Math.min(...sprites.map((sprite) => sprite.x - sprite.displayWidth / 2)),
+        right: Math.max(...sprites.map((sprite) => sprite.x + sprite.displayWidth / 2)),
+        top: Math.min(...sprites.map((sprite) => sprite.y - sprite.displayHeight / 2)),
+        bottom: Math.max(...sprites.map((sprite) => sprite.y + sprite.displayHeight / 2))
+      };
+    }
+
+    clampWordDelta(positions, deltaX, deltaY) {
+      const left = Math.min(
+        ...positions.map((position) => position.x - position.sprite.displayWidth / 2)
+      );
+      const right = Math.max(
+        ...positions.map((position) => position.x + position.sprite.displayWidth / 2)
+      );
+      const top = Math.min(
+        ...positions.map((position) => position.y - position.sprite.displayHeight / 2)
+      );
+      const bottom = Math.max(
+        ...positions.map((position) => position.y + position.sprite.displayHeight / 2)
+      );
+
+      return {
+        x: Phaser.Math.Clamp(deltaX, -left, SCREEN_WIDTH - right),
+        y: Phaser.Math.Clamp(deltaY, -top, SCREEN_HEIGHT - bottom)
+      };
+    }
+
+    selectWord(word) {
+      this.selectedWord = word;
 
       if (this.selectionFrame) {
         this.selectionFrame.destroy();
       }
 
+      const bounds = this.getWordBounds(word);
       this.selectionFrame = this.add.rectangle(
-        sprite.x,
-        sprite.y,
-        sprite.displayWidth + 18,
-        sprite.displayHeight + 18,
+        (bounds.left + bounds.right) / 2,
+        (bounds.top + bounds.bottom) / 2,
+        bounds.right - bounds.left + 18,
+        bounds.bottom - bounds.top + 18,
         0xffe36e,
         0.08
       );
@@ -271,35 +342,23 @@
         .setStrokeStyle(5, 0xffe36e, 1)
         .setDepth(99);
 
-      const definition = sprite.getData('definition');
-      const word = definition.id.startsWith('spice-') ? 'SPICE' : 'CREAM';
-      showEditorStatus(`${word} · ${definition.letter}`);
-    }
-
-    setEditorZoom(value) {
-      const zoom = Phaser.Math.Clamp(value, MIN_ZOOM, MAX_ZOOM);
-
-      this.cameras.main
-        .setZoom(zoom)
-        .centerOn(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-
-      zoomResetButton.textContent = `${Math.round(zoom * 100)}%`;
-      showEditorStatus(`Масштаб ${Math.round(zoom * 100)}%`);
+      showEditorStatus(word);
     }
 
     updateSelectionFrame() {
-      if (!this.selectionFrame || !this.selectedLetter) {
+      if (!this.selectionFrame || !this.selectedWord) {
         return;
       }
 
+      const bounds = this.getWordBounds(this.selectedWord);
       this.selectionFrame.setPosition(
-        this.selectedLetter.x,
-        this.selectedLetter.y
+        (bounds.left + bounds.right) / 2,
+        (bounds.top + bounds.bottom) / 2
       );
     }
 
-    moveSelectedLetter(event) {
-      if (!this.selectedLetter) {
+    moveSelectedWord(event) {
+      if (!this.selectedWord || this.isWavePlaying) {
         return;
       }
 
@@ -318,19 +377,70 @@
       event.preventDefault();
 
       const step = event.shiftKey ? KEYBOARD_FAST_STEP : KEYBOARD_STEP;
-      const sprite = this.selectedLetter;
-      sprite.setPosition(
-        Phaser.Math.Clamp(sprite.x + direction.x * step, 0, SCREEN_WIDTH),
-        Phaser.Math.Clamp(sprite.y + direction.y * step, 0, SCREEN_HEIGHT)
+      const sprites = this.getWordSprites(this.selectedWord);
+      const positions = sprites.map((sprite) => ({
+        sprite,
+        x: sprite.x,
+        y: sprite.y
+      }));
+      const delta = this.clampWordDelta(
+        positions,
+        direction.x * step,
+        direction.y * step
       );
+
+      sprites.forEach((sprite) => {
+        sprite.setPosition(sprite.x + delta.x, sprite.y + delta.y);
+      });
 
       this.updateSelectionFrame();
       saveLetterPositions();
+      showEditorStatus(this.selectedWord);
+    }
 
-      const definition = sprite.getData('definition');
-      showEditorStatus(
-        `${definition.letter}: ${Math.round(sprite.x)}, ${Math.round(sprite.y)}`
-      );
+    queueWordWave(word, startDelay) {
+      const sprites = this.getWordSprites(word);
+
+      sprites.forEach((sprite, index) => {
+        const baseY = sprite.y;
+        this.tweens.add({
+          targets: sprite,
+          y: baseY - WAVE_HEIGHT,
+          duration: WAVE_DURATION,
+          delay: startDelay + index * WAVE_LETTER_DELAY,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          onComplete: () => {
+            sprite.y = baseY;
+          }
+        });
+      });
+
+      return startDelay
+        + (sprites.length - 1) * WAVE_LETTER_DELAY
+        + WAVE_DURATION * 2;
+    }
+
+    playLogoWave() {
+      if (this.isWavePlaying) {
+        return;
+      }
+
+      this.isWavePlaying = true;
+      waveButton.disabled = true;
+      this.selectionFrame?.setVisible(false);
+      showEditorStatus('Волна SPICE → CREAM');
+
+      const spiceEnd = this.queueWordWave('SPICE', 0);
+      const creamEnd = this.queueWordWave('CREAM', spiceEnd + WAVE_WORD_GAP);
+
+      this.time.delayedCall(creamEnd + 30, () => {
+        this.isWavePlaying = false;
+        waveButton.disabled = false;
+        this.selectionFrame?.setVisible(true);
+        this.updateSelectionFrame();
+        showEditorStatus('Волна завершена');
+      });
     }
   }
 
@@ -353,18 +463,13 @@
   }
 
   copyButton.addEventListener('click', copyLetterPositions);
-  resetButton.addEventListener('click', resetLetterPositions);
-  zoomOutButton.addEventListener('click', () => changeZoom(-ZOOM_STEP));
-  zoomInButton.addEventListener('click', () => changeZoom(ZOOM_STEP));
-  zoomResetButton.addEventListener('click', () => {
-    if (scene) {
-      scene.setEditorZoom(1);
-    }
-  });
+  waveButton.addEventListener('click', () => scene?.playLogoWave());
+  resetButton.addEventListener('click', resetWordPositions);
 
   window.spiceCreamEditor = {
     getPositions: getLetterPositions,
-    resetPositions: resetLetterPositions
+    resetPositions: resetWordPositions,
+    playWave: () => scene?.playLogoWave()
   };
 
   if (!window.Phaser) {
