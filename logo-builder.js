@@ -325,6 +325,7 @@
       window.transitionScene = this;
       this.letterSprites = new Map();
       this.sparkleChannels = new Set();
+      this.activeSparkles = new Set();
       this.selectedWord = null;
       this.selectionFrame = null;
       this.dragState = null;
@@ -442,6 +443,14 @@
       if (waveSettings.loop) {
         this.time.delayedCall(250, () => this.playLogoWave());
       }
+    }
+
+    update(time, delta) {
+      const rotationDelta = sparkleSettings.rotationSpeed * delta / 1000;
+
+      this.activeSparkles.forEach((sparkle) => {
+        sparkle.angle += rotationDelta;
+      });
     }
 
     getWordSprites(word) {
@@ -627,8 +636,6 @@
       const startAngle = Phaser.Math.Between(0, 359);
       const growDuration = Phaser.Math.Between(260, 480);
       const shrinkDuration = Phaser.Math.Between(240, 420);
-      const totalDuration = growDuration + settings.pause + shrinkDuration;
-      const totalRotation = settings.rotationSpeed * totalDuration / 1000;
 
       sparkle
         .setDepth(50)
@@ -637,12 +644,7 @@
         .setAngle(startAngle)
         .setBlendMode(Phaser.BlendModes.ADD);
 
-      this.tweens.add({
-        targets: sparkle,
-        angle: startAngle + totalRotation,
-        duration: totalDuration,
-        ease: 'Linear'
-      });
+      this.activeSparkles.add(sparkle);
 
       this.tweens.add({
         targets: sparkle,
@@ -659,6 +661,7 @@
               duration: shrinkDuration,
               ease: 'Sine.easeIn',
               onComplete: () => {
+                this.activeSparkles.delete(sparkle);
                 sparkle.destroy();
                 onComplete?.();
               }
