@@ -48,74 +48,73 @@
       text-align: center;
       background: #09070d;
     }
+
+    #editor-controls {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right));
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      background: rgba(9, 7, 13, 0.78);
+      backdrop-filter: blur(8px);
+    }
+
+    #editor-controls button {
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 8px;
+      color: #ffffff;
+      font: 600 13px/1 Arial, sans-serif;
+      cursor: pointer;
+      background: #d83d88;
+    }
+
+    #editor-controls button:hover {
+      background: #ed4e9b;
+    }
+
+    #editor-controls button:focus-visible {
+      outline: 3px solid #ffffff;
+      outline-offset: 2px;
+    }
+
+    #editor-status {
+      min-width: 74px;
+      color: rgba(255, 255, 255, 0.75);
+      font: 12px/1 Arial, sans-serif;
+      text-align: center;
+    }
+
+    @media (max-width: 700px) {
+      #editor-controls {
+        top: auto;
+        right: 8px;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        left: 8px;
+        justify-content: center;
+      }
+
+      #editor-status {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="game"></div>
   <div id="message" role="alert"></div>
+  <div id="editor-controls" aria-label="Управление редактором букв">
+    <button id="copy-positions" type="button">Скопировать позиции</button>
+    <button id="reset-positions" type="button">Сбросить</button>
+    <span id="editor-status" aria-live="polite">Готово</span>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script>
-    const SCREEN_WIDTH = 1080;
-    const SCREEN_HEIGHT = 2048;
-    const LOGO_PATH = 'logo_small.png';
-
-    const message = document.getElementById('message');
-    const logoSource = new Image();
-
-    function showMessage(text) {
-      message.textContent = text;
-      message.style.display = 'grid';
-    }
-
-    if (!window.Phaser) {
-      showMessage(
-        'Не удалось загрузить Phaser. Проверьте подключение к интернету и обновите страницу.'
-      );
-      throw new Error('Phaser did not load.');
-    }
-
-    class TransitionScene extends Phaser.Scene {
-      constructor() {
-        super('TransitionScene');
-      }
-
-      create() {
-        this.cameras.main.setBackgroundColor('#24152f');
-        this.textures.addImage('spice-cream-logo', logoSource);
-
-        const logo = this.add.image(
-          SCREEN_WIDTH / 2,
-          SCREEN_HEIGHT / 2,
-          'spice-cream-logo'
-        );
-
-        const maxLogoWidth = SCREEN_WIDTH * 0.86;
-        const scale = Math.min(1, maxLogoWidth / logo.width);
-        logo.setScale(scale);
-      }
-    }
-
-    function startGame() {
-      new Phaser.Game({
-        type: Phaser.AUTO,
-        parent: 'game',
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
-        backgroundColor: '#24152f',
-        scene: TransitionScene,
-        scale: {
-          mode: Phaser.Scale.FIT,
-          autoCenter: Phaser.Scale.CENTER_BOTH
-        }
-      });
-    }
-
-    logoSource.addEventListener('load', startGame, { once: true });
-    logoSource.addEventListener('error', () => {
-      showMessage(`Не удалось загрузить изображение: ${LOGO_PATH}`);
-    }, { once: true });
-    logoSource.src = LOGO_PATH;
-  </script>
+  <script src="logo-builder.js"></script>
 </body>
 </html>
