@@ -4,10 +4,12 @@
   const SCREEN_WIDTH = 1080;
   const SCREEN_HEIGHT = 2048;
   const REFERENCE_OPACITY = 0.5;
+  const KEYBOARD_STEP = 1;
+  const KEYBOARD_FAST_STEP = 10;
   const STORAGE_KEY = 'spice-cream-letter-layout-v1';
 
   const ASSETS = [
-    { key: 'reference-logo', src: 'logo_small.png' },
+    { key: 'reference-logo', src: 'logo_big.png' },
     { key: 'letter-s', src: 's.png' },
     { key: 'letter-p', src: 'p.png' },
     { key: 'letter-i', src: 'i.png' },
@@ -49,7 +51,7 @@
     editorStatus.textContent = text;
     window.clearTimeout(statusTimer);
     statusTimer = window.setTimeout(() => {
-      editorStatus.textContent = 'Готово';
+      editorStatus.textContent = 'Клик → стрелки';
     }, 1600);
   }
 
@@ -126,6 +128,7 @@
       scene.letterSprites.get(definition.id).setPosition(definition.x, definition.y);
     });
 
+    scene.updateSelectionFrame();
     showEditorStatus('Сброшено');
   }
 
@@ -138,6 +141,8 @@
       scene = this;
       window.transitionScene = this;
       this.letterSprites = new Map();
+      this.selectedLetter = null;
+      this.selectionFrame = null;
       this.cameras.main.setBackgroundColor('#24152f');
 
       ASSETS.forEach((asset) => {
@@ -170,14 +175,20 @@
         sprite
           .setDepth(10)
           .setName(definition.id)
+          .setData('definition', definition)
           .setInteractive({ useHandCursor: true });
 
         this.input.setDraggable(sprite);
         this.letterSprites.set(definition.id, sprite);
+
+        sprite.on('pointerdown', () => {
+          this.selectLetter(sprite);
+        });
       });
 
       this.input.on('dragstart', (pointer, sprite) => {
-        sprite.setDepth(100).setAlpha(0.82);
+        this.selectLetter(sprite);
+        sprite.setAlpha(0.82);
       });
 
       this.input.on('drag', (pointer, sprite, dragX, dragY) => {
@@ -185,15 +196,104 @@
           Phaser.Math.Clamp(dragX, 0, SCREEN_WIDTH),
           Phaser.Math.Clamp(dragY, 0, SCREEN_HEIGHT)
         );
+        this.updateSelectionFrame();
       });
 
       this.input.on('dragend', (pointer, sprite) => {
         sprite
           .setPosition(Math.round(sprite.x), Math.round(sprite.y))
-          .setDepth(10)
+          .setDepth(100)
           .setAlpha(1);
+        this.updateSelectionFrame();
         saveLetterPositions();
       });
+
+      this.input.keyboard.addCapture([
+        Phaser.Input.Keyboard.KeyCodes.LEFT,
+        Phaser.Input.Keyboard.KeyCodes.RIGHT,
+        Phaser.Input.Keyboard.KeyCodes.UP,
+        Phaser.Input.Keyboard.KeyCodes.DOWN
+      ]);
+
+      this.input.keyboard.on('keydown', (event) => {
+        this.moveSelectedLetter(event);
+      });
+    }
+
+    selectLetter(sprite) {
+      if (this.selectedLetter && this.selectedLetter !== sprite) {
+        this.selectedLetter.setDepth(10);
+      }
+
+      this.selectedLetter = sprite;
+      sprite.setDepth(100);
+
+      if (this.selectionFrame) {
+        this.selectionFrame.destroy();
+      }
+
+      this.selectionFrame = this.add.rectangle(
+        sprite.x,
+        sprite.y,
+        sprite.displayWidth + 18,
+        sprite.displayHeight + 18,
+        0xffe36e,
+        0.08
+      );
+
+      this.selectionFrame
+        .setStrokeStyle(5, 0xffe36e, 1)
+        .setDepth(99);
+
+      const definition = sprite.getData('definition');
+      const word = definition.id.startsWith('spice-') ? 'SPICE' : 'CREAM';
+      showEditorStatus(`${word} · ${definition.letter}`);
+    }
+
+    updateSelectionFrame() {
+      if (!this.selectionFrame || !this.selectedLetter) {
+        return;
+      }
+
+      this.selectionFrame.setPosition(
+        this.selectedLetter.x,
+        this.selectedLetter.y
+      );
+    }
+
+    moveSelectedLetter(event) {
+      if (!this.selectedLetter) {
+        return;
+      }
+
+      const directions = {
+        ArrowLeft: { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 },
+        ArrowUp: { x: 0, y: -1 },
+        ArrowDown: { x: 0, y: 1 }
+      };
+      const direction = directions[event.key];
+
+      if (!direction) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const step = event.shiftKey ? KEYBOARD_FAST_STEP : KEYBOARD_STEP;
+      const sprite = this.selectedLetter;
+      sprite.setPosition(
+        Phaser.Math.Clamp(sprite.x + direction.x * step, 0, SCREEN_WIDTH),
+        Phaser.Math.Clamp(sprite.y + direction.y * step, 0, SCREEN_HEIGHT)
+      );
+
+      this.updateSelectionFrame();
+      saveLetterPositions();
+
+      const definition = sprite.getData('definition');
+      showEditorStatus(
+        `${definition.letter}: ${Math.round(sprite.x)}, ${Math.round(sprite.y)}`
+      );
     }
   }
 
