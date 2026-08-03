@@ -446,23 +446,15 @@
     }
 
     spawnSparkle() {
-      const target = Phaser.Utils.Array.GetRandom(
-        Array.from(this.letterSprites.values())
-      );
-      const x = target.x + Phaser.Math.FloatBetween(
-        -target.displayWidth * 0.36,
-        target.displayWidth * 0.36
-      );
-      const y = target.y + Phaser.Math.FloatBetween(
-        -target.displayHeight * 0.34,
-        target.displayHeight * 0.34
-      );
+      const bounds = this.getLogoBounds();
+      const x = Phaser.Math.FloatBetween(bounds.left - 12, bounds.right + 12);
+      const y = Phaser.Math.FloatBetween(bounds.top - 12, bounds.bottom + 12);
       const sparkle = this.add.image(
         x,
         y,
         Phaser.Utils.Array.GetRandom(SPARK_TEXTURES)
       );
-      const targetScale = Phaser.Math.FloatBetween(0.8, 1.65);
+      const targetScale = Phaser.Math.FloatBetween(1.15, 2.2);
 
       sparkle
         .setDepth(50)
