@@ -326,6 +326,7 @@
       this.letterSprites = new Map();
       this.sparkleChannels = new Set();
       this.activeSparkles = new Set();
+      this.sparkleRotationAngle = 0;
       this.selectedWord = null;
       this.selectionFrame = null;
       this.dragState = null;
@@ -447,9 +448,14 @@
 
     update(time, delta) {
       const rotationDelta = sparkleSettings.rotationSpeed * delta / 1000;
+      this.sparkleRotationAngle = Phaser.Math.Wrap(
+        this.sparkleRotationAngle + rotationDelta,
+        -180,
+        180
+      );
 
       this.activeSparkles.forEach((sparkle) => {
-        sparkle.angle += rotationDelta;
+        sparkle.setAngle(this.sparkleRotationAngle);
       });
     }
 
@@ -633,7 +639,6 @@
       const settings = { ...sparkleSettings };
       const targetScale = Phaser.Math.FloatBetween(1.15, 2.2)
         * settings.scale;
-      const startAngle = Phaser.Math.Between(0, 359);
       const growDuration = Phaser.Math.Between(260, 480);
       const shrinkDuration = Phaser.Math.Between(240, 420);
 
@@ -641,7 +646,7 @@
         .setDepth(50)
         .setAlpha(1)
         .setScale(0.02)
-        .setAngle(startAngle)
+        .setAngle(this.sparkleRotationAngle)
         .setBlendMode(Phaser.BlendModes.ADD);
 
       this.activeSparkles.add(sparkle);
